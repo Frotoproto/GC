@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Broadcast Chat</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.5.4/socket.io.js"></script>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h2>Broadcast Chat</h2>
+            <button id="logout-button" onclick="clearUsername()">Logout</button>
+        </div>
+        <div class="chat-area" id="chat-area">
+            <!-- Messages will appear here -->
+        </div>
+        <div class="input-area">
+            <input type="text" id="message-input" placeholder="Type your message... Chat is monitored">
+            <button id="send-button">Send</button>
+        </div>
+    </div>
+    
+
+    <!-- Username Popup -->
+    <div id="username-popup" class="popup">
+        <div class="popup-content">
+            <h3>Enter Your Username</h3>
+            <input type="text" id="username-input" placeholder="Username">
+            <p>By clicking submit, you agree that <b>you</b> are responsible for all messages sent by you.</p>
+            <button id="username-submit">Submit</button>
+        </div>
+    </div>
+<style>
+    /* General Styles */
+@font-face {
+    font-family: 'Title';
+    src: url(Poppins-Bold.ttf);
+}
+
+@font-face {
+    font-family: 'font';
+    src: url(Poppins-Regular.ttf);
+}
+
+body {
+    background-color: #4b4b4b;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+    font-family: 'font';
+}
+/* Logout Button */
+#logout-button {
+    background-color: #ff4444;
+    color: white;
+    border: none;
+    padding: 5px 20px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-left: 10px;
+    transition: all 0.7s ease;
+}
+
+#logout-button:hover {
+    background-color: #636363;
+    padding: 5px 10px;
+}
+
+/* Chat Container */
+.chat-container {
+    width: 1000px;
+    height: 500px;
+    background-color: #fff;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    display: flex;
+    flex-direction: column;
+}
+
+/* Chat Header */
+.chat-header {
+    background-color: #6200ea;
+    color: white;
+    padding: 15px;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+    text-align: center;
+}
+
+/* Chat Area */
+.chat-area {
+    flex: 1;
+    padding: 15px;
+    overflow-y: auto;
+    background-color: #979797;
+}
+
+/* Input Area */
+.input-area {
+    display: flex;
+    padding: 10px;
+    background-color: #ffffff;
+    border-top: 1px solid #ddd;
+}
+
+.input-area input {
+    flex: 1;
+    padding: 10px;
+    border: 1px solid #575757;
+    border-radius: 5px;
+    margin-right: 10px;
+}
+
+.input-area button {
+    padding: 10px 20px;
+    background-color: #3b0650;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.7s ease-in-out;
+}
+
+.input-area button:hover {
+    background-color: #5a5a5a;
+    border-radius: 50px;
+}
+
+/* Messages */
+.message {
+    margin-bottom: 10px;
+    padding: 10px;
+    border-radius: 5px;
+    max-width: 70%;
+}
+
+.user-message {
+    background-color: #6200ea;
+    color: white;
+    margin-left: auto;
+}
+
+.other-message {
+    background-color: #b6cac9;
+    color: black;
+    margin-right: auto;
+}
+
+/* Username Popup */
+.popup {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    justify-content: center;
+    align-items: center;
+}
+
+.popup-content {
+    background-color: white;
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+.popup-content p {
+    background-color: #c4c4c4;
+    padding: 10px;
+    border-radius: 4px;
+    width: 420px;
+    height: 40px;
+}
+/* Warning Alert */
+.alert {
+    position: fixed;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background-color: #ff4444;
+    color: white;
+    padding: 10px 20px;
+    border-radius: 5px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+}
+.popup-content input {
+    width: 400px;
+    padding: 10px;
+    margin: 10px 0;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+.popup-content button {
+    padding: 10px 20px;
+    background-color: #6200ea;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: all 0.7s ease;
+}
+
+.popup-content button:hover {
+    background-color: #a1a1a1;
+    border-radius: 50px;
+    transition: all 0.7s ease;
+}
+</style>
+<script>
+    const socket = io();
+
+    // DOM Elements
+    const chatArea = document.getElementById('chat-area');
+    const messageInput = document.getElementById('message-input');
+    const sendButton = document.getElementById('send-button');
+    const usernamePopup = document.getElementById('username-popup');
+    const usernameInput = document.getElementById('username-input');
+    const usernameSubmit = document.getElementById('username-submit');
+
+    let username = localStorage.getItem('username'); // Retrieve username from local storage
+
+    // If username is already stored, hide the popup
+    if (username) {
+        usernamePopup.style.display = 'none';
+    }
+
+    // Send message on button click
+    sendButton.addEventListener('click', () => {
+        const message = messageInput.value.trim();
+        if (message) {
+            if (!username) {
+                usernamePopup.style.display = 'flex';
+            } else {
+                sendMessage(message);
+            }
+        }
+    });
+
+    // Send message on pressing Enter
+    messageInput.addEventListener('keydown', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault(); // Prevent default form submission behavior
+            const message = messageInput.value.trim();
+            if (message) {
+                if (!username) {
+                    usernamePopup.style.display = 'flex';
+                } else {
+                    sendMessage(message);
+                }
+            }
+        }
+    });
+
+    // Submit username
+    usernameSubmit.addEventListener('click', () => {
+        const enteredUsername = usernameInput.value.trim();
+        if (enteredUsername) {
+            username = enteredUsername;
+            localStorage.setItem('username', username); // Save username to local storage
+            usernamePopup.style.display = 'none';
+            sendMessage(messageInput.value.trim());
+        }
+    });
+
+    // Send message to server
+    function sendMessage(message) {
+        // Check for inappropriate words (optional frontend validation)
+        const inappropriateWords = detectInappropriateWords(message);
+        if (inappropriateWords.length > 0) {
+            alert(`Warning: Your message contains inappropriate words: ${inappropriateWords.join(', ')}`);
+        }
+        socket.emit('send_message', { username: username, message: message });
+        messageInput.value = '';
+    }
+
+    // Detect inappropriate words (frontend validation)
+    function detectInappropriateWords(message) {
+        const inappropriateWords = [];
+        const censorList = ["badword1", "badword2", "curse", "inappropriate", "offensive"]; // Sync with backend
+        for (const word of censorList) {
+            if (message.toLowerCase().includes(word)) {
+                inappropriateWords.push(word);
+            }
+        }
+        return inappropriateWords;
+    }
+
+    // Receive messages from server
+    socket.on('receive_message', (data) => {
+        const messageElement = document.createElement('div');
+        messageElement.classList.add('message');
+        if (data.username === username) {
+            messageElement.classList.add('user-message');
+        } else {
+            messageElement.classList.add('other-message');
+        }
+        messageElement.innerHTML = `<strong>${data.username}:</strong> ${data.message}`;
+        chatArea.appendChild(messageElement);
+        chatArea.scrollTop = chatArea.scrollHeight; // Auto-scroll to bottom
+    });
+
+    // Optional: Clear username (logout)
+    function clearUsername() {
+    localStorage.removeItem('username');
+    username = null;
+    // Create a custom pop-up
+    const popup = document.createElement('div');
+    popup.style.position = 'fixed';
+    popup.style.top = '50%';
+    popup.style.left = '50%';
+    popup.style.transform = 'translate(-50%, -50%)';
+    popup.style.backgroundColor = 'white';
+    popup.style.padding = '20px';
+    popup.style.border = '1px solid black';
+    popup.style.borderRadius = '10px';
+    popup.style.boxShadow = '0px 0px 10px rgba(0, 0, 0, 0.2)';
+    popup.style.zIndex = '1000';
+    popup.style.textAlign = 'center';
+    popup.innerHTML = 'Please wait... Logging out';
+    document.body.appendChild(popup);
+    // Remove the pop-up after 2 seconds
+    setTimeout(() => {
+        document.body.removeChild(popup);
+        location.reload();
+    }, 2000);
+}
+</script>
+</body>
+</html>
